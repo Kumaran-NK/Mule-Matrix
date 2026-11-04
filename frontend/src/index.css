@@ -1,43 +1,35 @@
 @tailwind base;
+
 @tailwind components;
+
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-slate-950 text-slate-100 font-sans antialiased;
-  }
+
+  body { @apply bg-slate-950 text-slate-100 font-sans antialiased; }
+
+  h1, h2, h3 { font-family: Newsreader, Georgia, serif; font-weight: 500; letter-spacing: -0.005em; }
+
+  h1 { font-size: 1.6rem; line-height: 1.15; }
+
 }
 
-/* React Flow custom styling */
-.react-flow__node {
-  border-radius: 0.75rem;
-  font-family: inherit;
-}
+.font-mono, .font-serif { font-variant-numeric: tabular-nums; }
 
-.react-flow__handle {
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  background-color: #3b82f6;
-  border: 2px solid #0f172a;
-}
+.animate-pulse, .animate-ping { animation: none !important; }
 
-.react-flow__controls button {
-  background-color: #1e293b;
-  border-bottom: 1px solid #334155;
-  color: #e2e8f0;
-}
+:focus-visible { outline: 2px solid #1B2433; outline-offset: 2px; }
 
-.react-flow__controls button:hover {
-  background-color: #334155;
-}
+::selection { background: #E3A59C; }
 
-.react-flow__controls button svg {
-  fill: currentColor;
-}
+/* Ledger tables: ruled rows and a double rule under the last line */
 
-.react-flow__minimap {
-  background-color: #0f172a !important;
-  border: 1px solid #334155 !important;
-  border-radius: 0.5rem;
-}
+table thead tr { border-bottom: 1px solid #98A595; }
+
+table thead th { font-weight: 400; }
+
+table tbody tr:last-child td { border-bottom: 3px double #1B2433; }
+
+/* Page headers: drop the boxed icon tiles */
+
+div.w-9.h-9.rounded-xl { display: none; }
