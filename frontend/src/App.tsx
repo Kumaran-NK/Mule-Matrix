@@ -1,165 +1,121 @@
 import React, { useState, useEffect } from 'react';
-
+import { Navbar } from './components/layout/Navbar';
+import { Sidebar, TabKey } from './components/layout/Sidebar';
 import { OverviewPage } from './pages/OverviewPage';
-
 import { WorkspacePage } from './pages/WorkspacePage';
-
 import { LineagePage } from './pages/LineagePage';
-
 import { ScreeningPage } from './pages/ScreeningPage';
-
 import { TimelinePage } from './pages/TimelinePage';
-
 import { EndpointsPage } from './pages/EndpointsPage';
-
 import { AssessmentPage } from './pages/AssessmentPage';
-
 import { IdentityPage } from './pages/IdentityPage';
-
 import { SimulatorPage } from './pages/SimulatorPage';
-
 import { ReportsPage } from './pages/ReportsPage';
-
-import { UserRole } from './types';
-
+import { UserRole, IdentityRequest } from './types';
 import { api } from './api/client';
 
-const GROUPS: { id: string; label: string; pages: [string, string][] }[] = [
-
-  { id: 'trail', label: 'Trail', pages: [['overview', 'Overview'], ['workspace', 'Money trail'], ['timeline', 'Timeline'], ['lineage', 'Lineage']] },
-
-  { id: 'evidence', label: 'Evidence', pages: [['endpoints', 'Where money exited']] },
-
-  { id: 'accounts', label: 'Accounts', pages: [['assessments', 'Risk'], ['screening', 'Flagged'], ['simulator', 'Simulator']] },
-
-  { id: 'identity', label: 'Identity', pages: [['identity', 'Requests']] },
-
-  { id: 'report', label: 'Report', pages: [['reports', 'Case report']] },
-
-];
-
 export function App() {
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const [currentRole, setCurrentRole] = useState<UserRole>('investigator');
+  const [pendingRequests, setPendingRequests] = useState<IdentityRequest[]>([]);
+  const [isResetting, setIsResetting] = useState(false);
 
-  const [page, setPage] = useState('overview');
+  useEffect(() => {
+    loadPendingRequests();
+    // Poll requests periodically or when role switches
+    const timer = setInterval(loadPendingRequests, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
-  const [role, setRole] = useState<UserRole>('investigator');
-
-  const [pending, setPending] = useState(0);
-
-  const [resetting, setResetting] = useState(false);
-
-  const group = GROUPS.find((g) => g.pages.some(([id]) => id === page)) || GROUPS[0];
-
-  async function loadPending() {
-
-    try { setPending((await api.getIdentityRequests()).filter((r) => r.status === 'PENDING').length); } catch {}
-
+  async function loadPendingRequests() {
+    try {
+      const allReqs = await api.getIdentityRequests();
+      const pending = allReqs.filter((r) => r.status === 'PENDING');
+      setPendingRequests(pending);
+    } catch (err) {
+      // Ignore initial connection err
+    }
   }
 
-  useEffect(() => { loadPending(); const t = setInterval(loadPending, 10000); return () => clearInterval(t); }, []);
-
-  async function reset() {
-
-    if (!confirm('Reset the simulation to the standard demo case?')) return;
-
-    setResetting(true);
-
-    try { await api.resetSimulator(); window.location.reload(); }
-
-    catch (e: any) { alert(`Reset failed: ${e.message}`); } finally { setResetting(false); }
-
+  async function handleResetData() {
+    if (!confirm('Reset simulation database to standard synthetic demo state?')) return;
+    setIsResetting(true);
+    try {
+      await api.resetSimulator();
+      await loadPendingRequests();
+      alert('Mule Matrix demonstration state reset successfully!');
+      window.location.reload();
+    } catch (err: any) {
+      alert(`Reset error: ${err.message}`);
+    } finally {
+      setIsResetting(false);
+    }
   }
 
   return (
+    <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans">
+      {/* Top Navbar */}
+      <Navbar
+        currentRole={currentRole}
+        onRoleChange={setCurrentRole}
+        onResetData={handleResetData}
+        isResetting={isResetting}
+      />
 
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Navigation Sidebar */}
+        <Sidebar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          pendingRequestsCount={pendingRequests.length}
+        />
 
-      <header className="sticky top-0 z-30 bg-slate-900 border-b border-slate-800">
+        {/* Main Content Viewport */}
+        <main className="flex-1 overflow-y-auto p-6 bg-slate-950/90">
+          {activeTab === 'overview' && (
+            <OverviewPage
+              onNavigateToWorkspace={() => setActiveTab('workspace')}
+              onNavigateToScreening={() => setActiveTab('screening')}
+            />
+          )}
 
-        <div className="max-w-6xl mx-auto px-8 h-12 flex items-center justify-between">
+          {activeTab === 'workspace' && (
+            <WorkspacePage
+              onNavigateToIdentity={() => setActiveTab('identity')}
+              onRequestSubmittedNotification={loadPendingRequests}
+            />
+          )}
 
-          <span className="font-serif italic text-xl">Mule Matrix</span>
+          {activeTab === 'lineage' && <LineagePage />}
 
-          <nav className="flex h-12 gap-7">
+          {activeTab === 'screening' && (
+            <ScreeningPage
+              onSelectCandidate={(pseudoId) => {
+                setActiveTab('workspace');
+              }}
+            />
+          )}
 
-            {GROUPS.map((g) => (
+          {activeTab === 'timeline' && <TimelinePage />}
 
-              <button key={g.id} onClick={() => setPage(g.pages[0][0])}
+          {activeTab === 'endpoints' && <EndpointsPage />}
 
-                className={`relative text-[13px] border-b-2 ${g.id === group.id ? 'border-rose-500 text-slate-100 font-medium' : 'border-transparent text-slate-400 hover:text-slate-100'}`}>
+          {activeTab === 'assessments' && <AssessmentPage />}
 
-                {g.label}
+          {activeTab === 'identity' && (
+            <IdentityPage
+              currentRole={currentRole}
+              onRoleSwitch={setCurrentRole}
+            />
+          )}
 
-                {g.id === 'identity' && pending > 0 && <span className="ml-1.5 text-[10px] bg-rose-600 text-white rounded-full px-1.5">{pending}</span>}
+          {activeTab === 'simulator' && <SimulatorPage />}
 
-              </button>
-
-            ))}
-
-          </nav>
-
-          <div className="flex items-center gap-4 text-xs text-slate-400">
-
-            <button onClick={reset} disabled={resetting} className="hover:text-slate-100 disabled:opacity-50">Reset demo</button>
-
-            <div className="flex p-0.5 bg-slate-800 rounded-lg">
-
-              {(['investigator', 'reviewer'] as UserRole[]).map((r) => (
-
-                <button key={r} onClick={() => setRole(r)} className={`px-3 py-1 rounded-md capitalize ${role === r ? 'bg-slate-900 text-slate-100' : ''}`}>{r}</button>
-
-              ))}
-
-            </div>
-
-          </div>
-
-        </div>
-
-        {group.pages.length > 1 && (
-
-          <div className="max-w-6xl mx-auto px-8 h-9 flex items-center gap-5 text-[13px] border-t border-slate-800">
-
-            {group.pages.map(([id, label]) => (
-
-              <button key={id} onClick={() => setPage(id)} className={page === id ? 'text-slate-100 font-medium' : 'text-slate-400 hover:text-slate-100'}>{label}</button>
-
-            ))}
-
-          </div>
-
-        )}
-
-      </header>
-
-      <main className="max-w-6xl mx-auto px-8 py-8">
-
-        {page === 'overview' && <OverviewPage onNavigateToWorkspace={() => setPage('workspace')} onNavigateToScreening={() => setPage('screening')} />}
-
-        {page === 'workspace' && <WorkspacePage onNavigateToIdentity={() => setPage('identity')} onRequestSubmittedNotification={loadPending} />}
-
-        {page === 'lineage' && <LineagePage />}
-
-        {page === 'screening' && <ScreeningPage onSelectCandidate={() => setPage('workspace')} />}
-
-        {page === 'timeline' && <TimelinePage />}
-
-        {page === 'endpoints' && <EndpointsPage />}
-
-        {page === 'assessments' && <AssessmentPage />}
-
-        {page === 'identity' && <IdentityPage currentRole={role} onRoleSwitch={setRole} />}
-
-        {page === 'simulator' && <SimulatorPage />}
-
-        {page === 'reports' && <ReportsPage />}
-
-      </main>
-
+          {activeTab === 'reports' && <ReportsPage />}
+        </main>
+      </div>
     </div>
-
   );
-
 }
 
 export default App;
