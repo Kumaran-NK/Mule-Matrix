@@ -22,7 +22,6 @@ export function App() {
 
   useEffect(() => {
     loadPendingRequests();
-    // Poll requests periodically or when role switches
     const timer = setInterval(loadPendingRequests, 10000);
     return () => clearInterval(timer);
   }, []);
@@ -30,88 +29,62 @@ export function App() {
   async function loadPendingRequests() {
     try {
       const allReqs = await api.getIdentityRequests();
-      const pending = allReqs.filter((r) => r.status === 'PENDING');
-      setPendingRequests(pending);
+      setPendingRequests(allReqs.filter((r) => r.status === 'PENDING'));
     } catch (err) {
-      // Ignore initial connection err
+      // backend may not be up yet
     }
   }
 
   async function handleResetData() {
-    if (!confirm('Reset simulation database to standard synthetic demo state?')) return;
+    if (!confirm('Reset the simulation to the standard synthetic demo state?')) return;
     setIsResetting(true);
     try {
       await api.resetSimulator();
       await loadPendingRequests();
-      alert('Mule Matrix demonstration state reset successfully!');
+      alert('Demo state reset.');
       window.location.reload();
     } catch (err: any) {
-      alert(`Reset error: ${err.message}`);
+      alert(`Reset failed: ${err.message}`);
     } finally {
       setIsResetting(false);
     }
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans">
-      {/* Top Navbar */}
-      <Navbar
-        currentRole={currentRole}
-        onRoleChange={setCurrentRole}
-        onResetData={handleResetData}
-        isResetting={isResetting}
-      />
+    <div className="app-shell flex h-screen bg-paper text-ink">
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} pendingRequestsCount={pendingRequests.length} />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Navigation Sidebar */}
-        <Sidebar
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          pendingRequestsCount={pendingRequests.length}
+      <div className="flex-1 flex flex-col min-w-0">
+        <Navbar
+          currentRole={currentRole}
+          onRoleChange={setCurrentRole}
+          onResetData={handleResetData}
+          isResetting={isResetting}
         />
 
-        {/* Main Content Viewport */}
-        <main className="flex-1 overflow-y-auto p-6 bg-slate-950/90">
-          {activeTab === 'overview' && (
-            <OverviewPage
-              onNavigateToWorkspace={() => setActiveTab('workspace')}
-              onNavigateToScreening={() => setActiveTab('screening')}
-            />
-          )}
-
-          {activeTab === 'workspace' && (
-            <WorkspacePage
-              onNavigateToIdentity={() => setActiveTab('identity')}
-              onRequestSubmittedNotification={loadPendingRequests}
-            />
-          )}
-
-          {activeTab === 'lineage' && <LineagePage />}
-
-          {activeTab === 'screening' && (
-            <ScreeningPage
-              onSelectCandidate={(pseudoId) => {
-                setActiveTab('workspace');
-              }}
-            />
-          )}
-
-          {activeTab === 'timeline' && <TimelinePage />}
-
-          {activeTab === 'endpoints' && <EndpointsPage />}
-
-          {activeTab === 'assessments' && <AssessmentPage />}
-
-          {activeTab === 'identity' && (
-            <IdentityPage
-              currentRole={currentRole}
-              onRoleSwitch={setCurrentRole}
-            />
-          )}
-
-          {activeTab === 'simulator' && <SimulatorPage />}
-
-          {activeTab === 'reports' && <ReportsPage />}
+        <main className="app-main flex-1 overflow-y-auto px-8 py-8">
+          <div className="max-w-[1320px] mx-auto">
+            {activeTab === 'overview' && (
+              <OverviewPage
+                onNavigateToWorkspace={() => setActiveTab('workspace')}
+                onNavigateToScreening={() => setActiveTab('screening')}
+              />
+            )}
+            {activeTab === 'workspace' && (
+              <WorkspacePage
+                onNavigateToIdentity={() => setActiveTab('identity')}
+                onRequestSubmittedNotification={loadPendingRequests}
+              />
+            )}
+            {activeTab === 'lineage' && <LineagePage />}
+            {activeTab === 'screening' && <ScreeningPage onSelectCandidate={() => setActiveTab('workspace')} />}
+            {activeTab === 'timeline' && <TimelinePage />}
+            {activeTab === 'endpoints' && <EndpointsPage />}
+            {activeTab === 'assessments' && <AssessmentPage />}
+            {activeTab === 'identity' && <IdentityPage currentRole={currentRole} onRoleSwitch={setCurrentRole} />}
+            {activeTab === 'simulator' && <SimulatorPage />}
+            {activeTab === 'reports' && <ReportsPage />}
+          </div>
         </main>
       </div>
     </div>

@@ -4,6 +4,7 @@ import {
   MiniMap,
   Controls,
   Background,
+  BackgroundVariant,
   useNodesState,
   useEdgesState,
   Node,
@@ -15,6 +16,7 @@ import '@xyflow/react/dist/style.css';
 import { AccountNode } from './AccountNode';
 import { NodeDetailsDrawer } from './NodeDetailsDrawer';
 import { GraphNodeData, GraphEdgeData } from '../../types';
+import { inr } from '../ui';
 
 interface InvestigationGraphProps {
   nodesData: GraphNodeData[];
@@ -22,50 +24,34 @@ interface InvestigationGraphProps {
   onRequestIdentity: (pseudoId: string) => void;
 }
 
-// IMPORTANT: nodeTypes must be defined outside the component to avoid re-registration
-const nodeTypes = {
-  accountNode: AccountNode,
-};
+// Must live outside the component so React Flow does not re-register it.
+const nodeTypes = { accountNode: AccountNode };
 
 function buildFlowData(nodesData: GraphNodeData[], edgesData: GraphEdgeData[]) {
   if (!nodesData || nodesData.length === 0) {
     return { flowNodes: [] as Node[], flowEdges: [] as Edge[] };
   }
 
-  // Group nodes by type for hierarchical left-to-right layout
   const seedNodes = nodesData.filter((n) => n.is_seed);
   const endpoints = nodesData.filter((n) => n.is_endpoint && !n.is_seed);
   const intermediaries = nodesData.filter((n) => !n.is_seed && !n.is_endpoint);
 
   const positions: Record<string, { x: number; y: number }> = {};
 
-  // Seed accounts on far left (column 0)
-  seedNodes.forEach((n, idx) => {
-    positions[n.id] = { x: 50, y: 200 + idx * 200 };
-  });
+  seedNodes.forEach((n, idx) => (positions[n.id] = { x: 40, y: 220 + idx * 220 }));
 
-  // Primary mules (column 1)
   const primaryMules = intermediaries.filter((n) => n.pseudo_id.includes('MULE-01'));
-  primaryMules.forEach((n, idx) => {
-    positions[n.id] = { x: 400, y: 200 + idx * 200 };
-  });
+  primaryMules.forEach((n, idx) => (positions[n.id] = { x: 400, y: 220 + idx * 220 }));
 
-  // Secondary intermediaries (column 2)
   const secondary = intermediaries.filter((n) => !n.pseudo_id.includes('MULE-01'));
-  secondary.forEach((n, idx) => {
-    positions[n.id] = { x: 750, y: 100 + idx * 200 };
-  });
+  secondary.forEach((n, idx) => (positions[n.id] = { x: 760, y: 80 + idx * 230 }));
 
-  // Terminal endpoints on far right (column 3)
-  endpoints.forEach((n, idx) => {
-    positions[n.id] = { x: 1100, y: 50 + idx * 180 };
-  });
+  endpoints.forEach((n, idx) => (positions[n.id] = { x: 1120, y: 20 + idx * 210 }));
 
-  // Fallback for any unpositioned nodes
   let fallbackIdx = 0;
   nodesData.forEach((n) => {
     if (!positions[n.id]) {
-      positions[n.id] = { x: 550 + (fallbackIdx % 3) * 200, y: 400 + Math.floor(fallbackIdx / 3) * 200 };
+      positions[n.id] = { x: 550 + (fallbackIdx % 3) * 260, y: 420 + Math.floor(fallbackIdx / 3) * 220 };
       fallbackIdx++;
     }
   });
@@ -78,33 +64,23 @@ function buildFlowData(nodesData: GraphNodeData[], edgesData: GraphEdgeData[]) {
   }));
 
   const flowEdges: Edge[] = edgesData.map((edge) => {
-    const isReversal = edge.is_reversal;
+    const color = edge.is_reversal ? '#FF6A13' : '#000000';
     return {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      animated: true,
+      animated: !edge.is_reversal,
       style: {
-        stroke: isReversal ? '#f59e0b' : '#3b82f6',
+        stroke: color,
         strokeWidth: Math.max(2, Math.min(6, (edge.amount / 20000) * 3)),
+        strokeDasharray: edge.is_reversal ? '6 5' : undefined,
       },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: isReversal ? '#f59e0b' : '#3b82f6',
-      },
-      label: `₹${Number(edge.attributed_amount).toLocaleString('en-IN')}`,
-      labelStyle: {
-        fill: '#f1f5f9',
-        fontWeight: 600,
-        fontSize: 11,
-        fontFamily: 'monospace',
-      },
-      labelBgStyle: {
-        fill: '#0f172a',
-        fillOpacity: 0.85,
-      },
-      labelBgPadding: [6, 3] as [number, number],
-      labelBgBorderRadius: 4,
+      markerEnd: { type: MarkerType.ArrowClosed, color },
+      label: inr(edge.attributed_amount, 0),
+      labelStyle: { fill: '#000', fontWeight: 700, fontSize: 14, fontFamily: '"Instrument Sans", sans-serif' },
+      labelBgStyle: { fill: '#fff', stroke: '#000', strokeWidth: 1 },
+      labelBgPadding: [8, 4] as [number, number],
+      labelBgBorderRadius: 6,
       data: { ...edge },
     };
   });
@@ -112,23 +88,15 @@ function buildFlowData(nodesData: GraphNodeData[], edgesData: GraphEdgeData[]) {
   return { flowNodes, flowEdges };
 }
 
-export const InvestigationGraph: React.FC<InvestigationGraphProps> = ({
-  nodesData,
-  edgesData,
-  onRequestIdentity,
-}) => {
+export const InvestigationGraph: React.FC<InvestigationGraphProps> = ({ nodesData, edgesData, onRequestIdentity }) => {
   const [selectedNode, setSelectedNode] = useState<GraphNodeData | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<GraphEdgeData | null>(null);
 
-  const { flowNodes, flowEdges } = useMemo(
-    () => buildFlowData(nodesData, edgesData),
-    [nodesData, edgesData]
-  );
+  const { flowNodes, flowEdges } = useMemo(() => buildFlowData(nodesData, edgesData), [nodesData, edgesData]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(flowNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(flowEdges);
 
-  // Sync nodes/edges when source data changes
   useEffect(() => {
     if (flowNodes.length > 0) {
       setNodes(flowNodes);
@@ -136,35 +104,29 @@ export const InvestigationGraph: React.FC<InvestigationGraphProps> = ({
     }
   }, [flowNodes, flowEdges, setNodes, setEdges]);
 
-  const onNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      setSelectedNode(node.data as unknown as GraphNodeData);
-      setSelectedEdge(null);
-    },
-    []
-  );
+  const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    setSelectedNode(node.data as unknown as GraphNodeData);
+    setSelectedEdge(null);
+  }, []);
 
-  const onEdgeClick = useCallback(
-    (_: React.MouseEvent, edge: Edge) => {
-      setSelectedEdge(edge.data as unknown as GraphEdgeData);
-      setSelectedNode(null);
-    },
-    []
-  );
+  const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
+    setSelectedEdge(edge.data as unknown as GraphEdgeData);
+    setSelectedNode(null);
+  }, []);
 
   if (nodesData.length === 0) {
     return (
-      <div className="w-full h-[620px] bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-center text-slate-400 text-sm">
-        <div className="text-center space-y-2">
-          <p className="font-semibold">No graph data available yet.</p>
-          <p className="text-xs text-slate-500">Click "Execute Provenance Trace" to generate the investigation graph.</p>
+      <div className="w-full h-[640px] bg-white border border-line rounded-xl flex items-center justify-center text-center">
+        <div>
+          <p className="text-lg font-semibold">No graph yet</p>
+          <p className="text-mute mt-1">Run a provenance trace to map where the funds went.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full h-[620px] bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+    <div className="relative w-full h-[640px] bg-white border border-line rounded-xl overflow-hidden">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -177,24 +139,21 @@ export const InvestigationGraph: React.FC<InvestigationGraphProps> = ({
         fitViewOptions={{ padding: 0.15 }}
         minZoom={0.3}
         maxZoom={2}
-        className="bg-slate-950"
       >
-        <Background color="#1e293b" gap={18} size={1.5} />
-        <Controls className="!bg-slate-900 !border-slate-800" />
+        <Background variant={BackgroundVariant.Dots} color="#C9C9C5" gap={22} size={1.6} />
+        <Controls showInteractive={false} />
         <MiniMap
-          nodeStrokeColor="#475569"
+          pannable
+          nodeStrokeColor="#000"
           nodeColor={(n: any) => {
-            if (n.data?.is_seed) return '#6366f1';
-            if (n.data?.assessment_category === 'LIKELY_MULE') return '#f43f5e';
-            if (n.data?.assessment_category === 'MERCHANT') return '#f59e0b';
-            if (n.data?.assessment_category === 'LEGITIMATE_COUNTERPARTY') return '#10b981';
-            return '#64748b';
+            if (n.data?.is_seed) return '#000000';
+            if (n.data?.assessment_category === 'LIKELY_MULE') return '#FF6A13';
+            return '#D4D4D0';
           }}
-          maskColor="rgba(15, 23, 42, 0.7)"
+          maskColor="rgba(0,0,0,0.06)"
         />
       </ReactFlow>
 
-      {/* Slide-out details drawer */}
       <NodeDetailsDrawer
         node={selectedNode}
         edge={selectedEdge}

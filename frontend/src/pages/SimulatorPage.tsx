@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Banknote, Send, RefreshCw, Building2, Landmark, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, Check } from 'lucide-react';
 import { api } from '../api/client';
 import { Bank, Account } from '../types';
+import { PageHeader, Pill, inr } from '../components/ui';
 
 export const SimulatorPage: React.FC = () => {
   const [banks, setBanks] = useState<Bank[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // Transfer form
   const [senderPseudo, setSenderPseudo] = useState('');
   const [receiverPseudo, setReceiverPseudo] = useState('');
   const [transferAmount, setTransferAmount] = useState<number>(5000);
@@ -18,25 +17,20 @@ export const SimulatorPage: React.FC = () => {
   const [transferResult, setTransferResult] = useState<any>(null);
 
   useEffect(() => {
-    loadSimulator();
+    load();
   }, []);
 
-  async function loadSimulator() {
+  async function load() {
     try {
-      const [banksData, accsData] = await Promise.all([
-        api.getBanks(),
-        api.getAccounts(),
-      ]);
-      setBanks(banksData);
-      setAccounts(accsData);
-      if (accsData.length >= 2) {
-        setSenderPseudo(accsData[0].pseudo_id);
-        setReceiverPseudo(accsData[1].pseudo_id);
+      const [b, a] = await Promise.all([api.getBanks(), api.getAccounts()]);
+      setBanks(b);
+      setAccounts(a);
+      if (a.length >= 2 && !senderPseudo) {
+        setSenderPseudo(a[0].pseudo_id);
+        setReceiverPseudo(a[1].pseudo_id);
       }
     } catch (err) {
       console.error('Failed to load simulator data', err);
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -46,15 +40,16 @@ export const SimulatorPage: React.FC = () => {
     setSubmitting(true);
     setTransferResult(null);
     try {
-      const res = await api.executeTransfer({
-        sender_pseudo_id: senderPseudo,
-        receiver_pseudo_id: receiverPseudo,
-        amount: transferAmount,
-        channel: channel,
-        description: description,
-      });
-      setTransferResult(res);
-      await loadSimulator();
+      setTransferResult(
+        await api.executeTransfer({
+          sender_pseudo_id: senderPseudo,
+          receiver_pseudo_id: receiverPseudo,
+          amount: transferAmount,
+          channel,
+          description,
+        })
+      );
+      await load();
     } catch (err: any) {
       alert(`Transfer failed: ${err.message}`);
     } finally {
@@ -62,195 +57,113 @@ export const SimulatorPage: React.FC = () => {
     }
   }
 
-  async function handleResetDemo() {
-    if (!confirm('Reset database to clean synthetic demo state?')) return;
+  async function handleReset() {
+    if (!confirm('Reset the database to the clean synthetic demo state?')) return;
     try {
       await api.resetSimulator();
-      alert('Database successfully reseeded!');
-      await loadSimulator();
+      alert('Demo data reseeded.');
+      await load();
     } catch (err: any) {
       alert(`Reset failed: ${err.message}`);
     }
   }
 
+  const accountOptions = accounts.map((acc) => (
+    <option key={acc.id} value={acc.pseudo_id}>
+      {acc.pseudo_id} ({acc.bank_code}) {inr(acc.current_balance, 0)}
+    </option>
+  ));
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-950 border border-blue-800 flex items-center justify-center text-blue-400">
-              <Banknote className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-100">
-                Multi-Bank Net-Banking Simulator
-              </h1>
-              <p className="text-xs text-slate-400">
-                Simulate transfers across 6 institutions, inspect liquidity, and test edge-case fund movements
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={handleResetDemo}
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold rounded-xl transition"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Reset / Reseed Demo Data</span>
+      <PageHeader
+        title="Bank simulator"
+        subtitle="Move money between the six simulated institutions to test edge cases, then trace it."
+        actions={
+          <button onClick={handleReset} className="btn-ghost">
+            <RefreshCw className="w-4 h-4" />
+            Reseed demo data
           </button>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Transfer Simulator Form */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <Send className="w-4 h-4 text-blue-400" />
-            <span>Initiate Simulated Transfer</span>
-          </h2>
-
-          <form onSubmit={handleTransfer} className="space-y-3 text-xs">
+      <div className="grid lg:grid-cols-3 gap-6 items-start">
+        <section className="card card-pad">
+          <h2 className="text-xl font-bold mb-4">Send a transfer</h2>
+          <form onSubmit={handleTransfer} className="space-y-4">
             <div>
-              <label className="text-slate-400 block mb-1">Sender Account</label>
-              <select
-                value={senderPseudo}
-                onChange={(e) => setSenderPseudo(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-slate-200 font-mono focus:outline-none focus:border-blue-500"
-              >
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.pseudo_id}>
-                    {acc.pseudo_id} ({acc.bank_code}) - ₹{Number(acc.current_balance).toLocaleString('en-IN')}
-                  </option>
-                ))}
-              </select>
+              <label className="label">From</label>
+              <select value={senderPseudo} onChange={(e) => setSenderPseudo(e.target.value)} className="field">{accountOptions}</select>
             </div>
-
             <div>
-              <label className="text-slate-400 block mb-1">Receiver Account</label>
-              <select
-                value={receiverPseudo}
-                onChange={(e) => setReceiverPseudo(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-slate-200 font-mono focus:outline-none focus:border-blue-500"
-              >
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.pseudo_id}>
-                    {acc.pseudo_id} ({acc.bank_code}) - ₹{Number(acc.current_balance).toLocaleString('en-IN')}
-                  </option>
-                ))}
-              </select>
+              <label className="label">To</label>
+              <select value={receiverPseudo} onChange={(e) => setReceiverPseudo(e.target.value)} className="field">{accountOptions}</select>
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-slate-400 block mb-1">Amount (₹)</label>
-                <input
-                  type="number"
-                  min="1"
-                  step="0.01"
-                  value={transferAmount}
-                  onChange={(e) => setTransferAmount(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-slate-200 font-mono focus:outline-none focus:border-blue-500"
-                  required
-                />
+                <label className="label">Amount (₹)</label>
+                <input type="number" min="1" step="0.01" value={transferAmount} onChange={(e) => setTransferAmount(Number(e.target.value))} className="field num" required />
               </div>
-
               <div>
-                <label className="text-slate-400 block mb-1">Channel</label>
-                <select
-                  value={channel}
-                  onChange={(e) => setChannel(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-blue-500"
-                >
+                <label className="label">Channel</label>
+                <select value={channel} onChange={(e) => setChannel(e.target.value)} className="field">
                   <option value="UPI">UPI</option>
                   <option value="IMPS">IMPS</option>
                   <option value="NEFT">NEFT</option>
-                  <option value="ATM">ATM Withdrawal</option>
+                  <option value="ATM">ATM withdrawal</option>
                   <option value="MERCHANT_POS">Merchant POS</option>
                 </select>
               </div>
             </div>
-
             <div>
-              <label className="text-slate-400 block mb-1">Description</label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-blue-500 font-sans"
-              />
+              <label className="label">Description</label>
+              <input value={description} onChange={(e) => setDescription(e.target.value)} className="field" />
             </div>
 
             {transferResult && (
-              <div className="p-3 bg-emerald-950/60 border border-emerald-800 rounded-xl text-emerald-300 font-medium space-y-1">
-                <div className="flex items-center gap-1.5 font-bold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>Transfer Successful!</span>
-                </div>
-                <div className="text-[11px] font-mono text-slate-300">
-                  Ref: {transferResult.transaction_ref}
-                </div>
+              <div className="rounded-lg bg-emerald-50 border border-emerald-300 p-3.5 text-emerald-900">
+                <div className="flex items-center gap-2 font-semibold"><Check className="w-4 h-4" strokeWidth={3} />Transfer posted</div>
+                <div className="id mt-0.5">{transferResult.transaction_ref}</div>
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl text-xs flex items-center justify-center gap-2 transition disabled:opacity-50"
-            >
-              <span>{submitting ? 'Executing Transfer...' : 'Send Funds (POSTED)'}</span>
+            <button type="submit" disabled={submitting} className="btn-primary w-full">
+              {submitting ? 'Sending…' : 'Send transfer'}
             </button>
           </form>
-        </div>
+        </section>
 
-        {/* Right: Participating Institutions & Balances */}
-        <div className="lg:col-span-2 bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-blue-400" />
-            <span>Participating Simulated Institutions ({banks.length})</span>
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {banks.map((b) => {
-              const bankAccounts = accounts.filter((a) => a.bank_id === b.id);
-              const totalBankLiquidity = bankAccounts.reduce(
-                (sum, a) => sum + Number(a.current_balance),
-                0
-              );
-              return (
-                <div
-                  key={b.id}
-                  className="bg-slate-950/80 border border-slate-800 p-4 rounded-xl text-xs space-y-2 hover:border-slate-700 transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-100">{b.name}</span>
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        b.is_participating
-                          ? 'bg-blue-950 text-blue-300 border border-blue-800'
-                          : 'bg-rose-950 text-rose-300 border border-rose-800'
-                      }`}
-                    >
-                      {b.is_participating ? 'PARTICIPATING' : 'EXTERNAL'}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center text-[11px] text-slate-400 pt-1">
-                    <span>Code: <strong className="font-mono text-slate-200">{b.code}</strong></span>
-                    <span>Accounts: <strong className="font-mono text-slate-200">{bankAccounts.length}</strong></span>
-                  </div>
-
-                  <div className="flex justify-between items-center text-[11px] border-t border-slate-800/80 pt-1.5">
-                    <span className="text-slate-400">Total Holdings:</span>
-                    <span className="font-mono font-bold text-emerald-400">
-                      ₹{totalBankLiquidity.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+        <section className="lg:col-span-2 card card-pad">
+          <h2 className="text-xl font-bold mb-4">Institutions ({banks.length})</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className="th">Bank</th>
+                  <th className="th">Code</th>
+                  <th className="th">Accounts</th>
+                  <th className="th">Holdings</th>
+                  <th className="th">Network</th>
+                </tr>
+              </thead>
+              <tbody>
+                {banks.map((b) => {
+                  const own = accounts.filter((a) => a.bank_id === b.id);
+                  const total = own.reduce((s, a) => s + Number(a.current_balance), 0);
+                  return (
+                    <tr key={b.id}>
+                      <td className="td font-semibold">{b.name}</td>
+                      <td className="td id">{b.code}</td>
+                      <td className="td num">{own.length}</td>
+                      <td className="td font-semibold num">{inr(total)}</td>
+                      <td className="td"><Pill tone={b.is_participating ? 'black' : 'outline'}>{b.is_participating ? 'Participating' : 'External'}</Pill></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

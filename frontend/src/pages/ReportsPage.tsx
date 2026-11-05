@@ -1,267 +1,158 @@
 import React, { useEffect, useState } from 'react';
-import {
-  FileSpreadsheet,
-  Printer,
-  ShieldCheck,
-  CheckCircle2,
-  AlertTriangle,
-  History,
-  Info,
-} from 'lucide-react';
+import { Printer, Check } from 'lucide-react';
 import { api } from '../api/client';
-import {
-  Case,
-  AccountAssessment,
-  EndpointObservation,
-  ReconciliationSummary,
-  AuditEvent,
-} from '../types';
+import { Case, AccountAssessment, ReconciliationSummary, AuditEvent } from '../types';
+import { Pill, categoryLabel, categoryTone, inr } from '../components/ui';
 
 export const ReportsPage: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);
   const [assessments, setAssessments] = useState<AccountAssessment[]>([]);
-  const [endpoints, setEndpoints] = useState<EndpointObservation[]>([]);
-  const [reconciliation, setReconciliation] = useState<ReconciliationSummary | null>(null);
-  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [recon, setRecon] = useState<ReconciliationSummary | null>(null);
+  const [audit, setAudit] = useState<AuditEvent[]>([]);
 
   useEffect(() => {
-    async function loadReport() {
+    (async () => {
       try {
-        const caseList = await api.getCases();
-        setCases(caseList);
-        if (caseList.length > 0) {
-          const caseId = caseList[0].id;
-          const [assessList, epList, reconData, auditList] = await Promise.all([
-            api.getCaseAssessments(caseId),
-            api.getCaseEndpoints(caseId),
-            api.getCaseReconciliation(caseId),
+        const list = await api.getCases();
+        setCases(list);
+        if (list.length > 0) {
+          const [a, r, ev] = await Promise.all([
+            api.getCaseAssessments(list[0].id),
+            api.getCaseReconciliation(list[0].id),
             api.getAuditEvents(),
           ]);
-          setAssessments(assessList);
-          setEndpoints(epList);
-          setReconciliation(reconData);
-          setAuditEvents(auditList);
+          setAssessments(a);
+          setRecon(r);
+          setAudit(ev);
         }
       } catch (err) {
         console.error('Failed to load report data', err);
-      } finally {
-        setLoading(false);
       }
-    }
-    loadReport();
+    })();
   }, []);
 
-  const currentCase = cases[0];
-
-  const handlePrint = () => {
-    window.print();
-  };
+  const c = cases[0];
+  const retained = recon?.retained_balance ?? recon?.total_retained ?? 0;
+  const offramps = recon?.terminal_offramps ?? Number(recon?.total_endpoints ?? 0) - Number(retained);
+  const balanced = recon ? Number(recon.discrepancy) === 0 : false;
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      {/* Header & Print Control */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-950 border border-blue-800 flex items-center justify-center text-blue-400">
-            <FileSpreadsheet className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-100">
-              Investigation Case Dossier & Audit Report
-            </h1>
-            <p className="text-xs text-slate-400">
-              Formal forensic summary with fund conservation reconciliation, account evidence, and tamper-evident logs
-            </p>
-          </div>
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div className="no-print flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[32px] leading-[1.1] font-bold">Case dossier</h1>
+          <p className="text-[16px] text-mute mt-2">A printable summary with reconciliation, account findings and the audit trail.</p>
         </div>
-
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-blue-600/30 transition"
-        >
+        <button onClick={() => window.print()} className="btn-primary">
           <Printer className="w-4 h-4" />
-          <span>Print / Export PDF Dossier</span>
+          Print or save as PDF
         </button>
       </div>
 
-      {/* Official Case Summary Card */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      <section className="card overflow-hidden">
+        <div className="bg-black text-white px-8 py-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
-              Case Reference Document
-            </span>
-            <h2 className="text-lg font-bold text-slate-100">{currentCase?.case_ref || 'CASE-2026-001'}</h2>
+            <div className="text-neutral-400">Case reference</div>
+            <div className="font-display text-3xl font-bold text-flame-500">{c?.case_ref || 'CASE-2026-001'}</div>
           </div>
-          <span className="px-3 py-1 bg-blue-950 text-blue-300 border border-blue-800 rounded-full font-mono text-xs font-bold">
-            CONFIDENTIAL • INVESTIGATION RECORD
-          </span>
+          <Pill tone="orange">Confidential investigation record</Pill>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-500 block text-[10px]">Title</span>
-            <span className="font-semibold text-slate-200 block">{currentCase?.title}</span>
-          </div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-500 block text-[10px]">Investigator</span>
-            <span className="font-semibold text-slate-200 block">{currentCase?.created_by}</span>
-          </div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-500 block text-[10px]">Traced Origin</span>
-            <span className="font-mono font-bold text-rose-300 block">₹1,00,000.00 INR</span>
-          </div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-500 block text-[10px]">Date Opened</span>
-            <span className="font-mono text-slate-300 block">
-              {currentCase ? new Date(currentCase.created_at).toLocaleDateString() : 'N/A'}
-            </span>
-          </div>
+        <div className="p-8">
+          <h2 className="text-2xl font-bold">{c?.title}</h2>
+          <dl className="grid sm:grid-cols-3 gap-6 mt-5">
+            <div><dt className="text-mute">Investigator</dt><dd className="font-semibold">{c?.created_by}</dd></div>
+            <div><dt className="text-mute">Traced origin</dt><dd className="font-semibold num">{inr(recon?.origin_amount ?? 100000)}</dd></div>
+            <div><dt className="text-mute">Opened</dt><dd className="font-semibold">{c ? new Date(c.created_at).toLocaleDateString() : 'N/A'}</dd></div>
+          </dl>
+          <p className="mt-6 text-[16px] leading-relaxed max-w-3xl">{c?.description}</p>
         </div>
+      </section>
 
-        <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-          <strong>Executive Summary: </strong>
-          {currentCase?.description}
-        </p>
-      </div>
-
-      {/* Amount Reconciliation Verification */}
-      {reconciliation && (
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>CBDC Provenance Reconciliation Invariant</span>
-            </h3>
-            <span className="text-xs font-mono font-bold text-emerald-400">
-              Discrepancy: ₹{Number(reconciliation.discrepancy).toFixed(2)} (Balanced)
-            </span>
+      {recon && (
+        <section className="card card-pad">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <h2 className="text-xl font-bold">Reconciliation</h2>
+            <Pill tone={balanced ? 'green' : 'red'}>
+              {balanced ? <><Check className="w-3.5 h-3.5 mr-1" strokeWidth={3} />Balanced, discrepancy {inr(0)}</> : `Discrepancy ${inr(recon.discrepancy)}`}
+            </Pill>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-              <span className="text-slate-500 block text-[10px]">Total Origin Introduced</span>
-              <span className="font-mono font-bold text-slate-100">
-                ₹{Number(reconciliation.origin_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-              <span className="text-slate-500 block text-[10px]">Observable Off-Ramps</span>
-              <span className="font-mono font-bold text-amber-300">
-                ₹{Number(reconciliation.terminal_offramps || (reconciliation.total_endpoints - (reconciliation.retained_balance || reconciliation.total_retained || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-              <span className="text-slate-500 block text-[10px]">Retained in Balances</span>
-              <span className="font-mono font-bold text-blue-300">
-                ₹{Number(reconciliation.retained_balance || reconciliation.total_retained || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-              <span className="text-slate-500 block text-[10px]">Reconciliation Check</span>
-              <span className="font-bold text-emerald-400 flex items-center gap-1 mt-0.5">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>100% Conserved</span>
-              </span>
-            </div>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {[
+              ['Origin introduced', inr(recon.origin_amount)],
+              ['Observable off-ramps', inr(offramps)],
+              ['Retained in balances', inr(retained)],
+            ].map(([k, v]) => (
+              <div key={k} className="rounded-xl bg-neutral-100 p-4">
+                <div className="text-mute">{k}</div>
+                <div className="font-display text-2xl font-bold num">{v}</div>
+              </div>
+            ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Account Findings Table */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 space-y-3">
-        <h3 className="text-sm font-bold text-slate-100">
-          Account Assessment & Counterparty Classification
-        </h3>
-
+      <section className="card card-pad">
+        <h2 className="text-xl font-bold mb-3">Account findings</h2>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-400 font-semibold">
-                <th className="py-2 px-3">Pseudonym</th>
-                <th className="py-2 px-3">Bank</th>
-                <th className="py-2 px-3">Category</th>
-                <th className="py-2 px-3">Confidence</th>
-                <th className="py-2 px-3">Attributed Funds</th>
+              <tr>
+                <th className="th">Account</th>
+                <th className="th">Bank</th>
+                <th className="th">Classification</th>
+                <th className="th">Confidence</th>
+                <th className="th">Attributed</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-sans">
+            <tbody>
               {assessments.map((a) => (
                 <tr key={a.id}>
-                  <td className="py-2.5 px-3 font-mono font-bold text-blue-400">{a.account_pseudo_id}</td>
-                  <td className="py-2.5 px-3 text-slate-300">{a.bank_name}</td>
-                  <td className="py-2.5 px-3">
-                    <span className="font-bold text-slate-200">{a.category.replace('_', ' ')}</span>
-                  </td>
-                  <td className="py-2.5 px-3 font-mono font-bold text-slate-200">
-                    {Math.round(a.confidence_score * 100)}%
-                  </td>
-                  <td className="py-2.5 px-3 font-mono font-bold text-rose-300">
-                    ₹{Number(a.attributed_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </td>
+                  <td className="td id">{a.account_pseudo_id}</td>
+                  <td className="td">{a.bank_name}</td>
+                  <td className="td"><Pill tone={categoryTone(a.category)}>{categoryLabel(a.category)}</Pill></td>
+                  <td className="td font-semibold num">{Math.round(a.confidence_score * 100)}%</td>
+                  <td className="td font-semibold num">{inr(a.attributed_amount)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      {/* Tamper-Evident Audit Log */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 space-y-3">
-        <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-          <History className="w-4 h-4 text-blue-400" />
-          <span>Tamper-Evident Investigation Audit Log ({auditEvents.length} Events)</span>
-        </h3>
-
-        <div className="overflow-x-auto max-h-60 overflow-y-auto">
-          <table className="w-full text-left text-xs border-collapse">
+      <section className="card card-pad">
+        <h2 className="text-xl font-bold mb-3">Audit log ({audit.length} events)</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-400 font-semibold">
-                <th className="py-2 px-3">Timestamp</th>
-                <th className="py-2 px-3">Actor</th>
-                <th className="py-2 px-3">Action</th>
-                <th className="py-2 px-3">Result</th>
-                <th className="py-2 px-3">Details</th>
+              <tr>
+                <th className="th">Time</th>
+                <th className="th">Actor</th>
+                <th className="th">Action</th>
+                <th className="th">Result</th>
+                <th className="th">Details</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-              {auditEvents.slice(0, 15).map((evt) => (
-                <tr key={evt.id}>
-                  <td className="py-2 px-3 text-slate-400">{new Date(evt.timestamp).toLocaleString()}</td>
-                  <td className="py-2 px-3 text-slate-200 font-bold">{evt.actor}</td>
-                  <td className="py-2 px-3 text-blue-400">{evt.action}</td>
-                  <td className="py-2 px-3">
-                    <span className={evt.result === 'SUCCESS' ? 'text-emerald-400' : 'text-rose-400'}>
-                      {evt.result}
-                    </span>
-                  </td>
-                  <td className="py-2 px-3 text-slate-400 truncate max-w-xs">
-                    {evt.details ? JSON.stringify(evt.details) : evt.reason || '-'}
-                  </td>
+            <tbody>
+              {audit.slice(0, 15).map((e) => (
+                <tr key={e.id}>
+                  <td className="td text-mute whitespace-nowrap">{new Date(e.timestamp).toLocaleString()}</td>
+                  <td className="td font-semibold">{e.actor}</td>
+                  <td className="td id">{e.action}</td>
+                  <td className="td"><Pill tone={e.result === 'SUCCESS' ? 'green' : 'red'}>{e.result}</Pill></td>
+                  <td className="td text-mute max-w-xs truncate">{e.details ? JSON.stringify(e.details) : e.reason || '-'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      {/* Known Limitations Disclaimer */}
-      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1.5">
-        <div className="flex items-center gap-1.5 font-bold text-slate-300">
-          <Info className="w-4 h-4 text-blue-400" />
-          <span>Important Prototype Scope & Limitations Statement (Section 17):</span>
-        </div>
-        <p>
-          • <strong>Synthetic Data:</strong> The banking network and transaction data are simulated. Does not integrate with live RBI e₹, MuleHunter, or live bank portals.
-        </p>
-        <p>
-          • <strong>Decision Support:</strong> Algorithmic scores and assessments provide evidence organization for investigators, not a legal finding of guilt.
-        </p>
-        <p>
-          • <strong>Innocent Counterparties:</strong> Legitimate merchants and unflagged counterparties receiving funds are preserved as non-mule nodes under explicit safeguards.
-        </p>
-      </div>
+      <section className="rounded-xl border border-dashed border-black p-5 text-[15px] space-y-1.5">
+        <div className="font-bold">Scope and limits of this prototype</div>
+        <p>All banks, accounts and transactions are synthetic. Nothing here connects to live RBI e₹, MuleHunter or bank systems.</p>
+        <p>Scores organise evidence for an investigator. They are not a finding of guilt.</p>
+        <p>Merchants and other counterparties that received funds are kept as non-mule nodes under explicit safeguards.</p>
+      </section>
     </div>
   );
 };

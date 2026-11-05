@@ -1,16 +1,8 @@
 import React, { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import {
-  ShieldAlert,
-  ShieldCheck,
-  Store,
-  HelpCircle,
-  Flag,
-  ArrowDownToLine,
-  Landmark,
-  Wallet,
-} from 'lucide-react';
+import { ArrowDownToLine, Landmark, Wallet, Store } from 'lucide-react';
 import { GraphNodeData } from '../../types';
+import { categoryLabel, endpointLabel, inr } from '../ui';
 
 interface AccountNodeProps {
   data: GraphNodeData;
@@ -18,99 +10,70 @@ interface AccountNodeProps {
 }
 
 export const AccountNode = memo(({ data, selected }: AccountNodeProps) => {
+  const cat = data.assessment_category;
   const isSeed = data.is_seed;
-  const isEndpoint = data.is_endpoint;
-  const category = data.assessment_category;
 
-  // Category styles
-  let badgeColor = 'bg-slate-800 text-slate-300 border-slate-700';
-  let borderColor = 'border-slate-700 bg-slate-900/95';
-  let Icon = HelpCircle;
-  let iconColor = 'text-slate-400';
+  let shell = 'bg-white border-neutral-300 text-black';
+  let inner = 'bg-neutral-100';
+  let sub = 'text-mute';
+  let tag = isSeed ? 'Seed account' : categoryLabel(cat);
 
   if (isSeed) {
-    badgeColor = 'bg-indigo-950 text-indigo-300 border-indigo-700';
-    borderColor = 'border-indigo-500 bg-indigo-950/80 shadow-indigo-500/20';
-    Icon = Flag;
-    iconColor = 'text-indigo-400';
-  } else if (category === 'LIKELY_MULE') {
-    badgeColor = 'bg-rose-950 text-rose-300 border-rose-700';
-    borderColor = 'border-rose-500 bg-rose-950/80 shadow-rose-500/20';
-    Icon = ShieldAlert;
-    iconColor = 'text-rose-400';
-  } else if (category === 'MERCHANT') {
-    badgeColor = 'bg-amber-950 text-amber-300 border-amber-700';
-    borderColor = 'border-amber-500 bg-amber-950/80 shadow-amber-500/20';
-    Icon = Store;
-    iconColor = 'text-amber-400';
-  } else if (category === 'LEGITIMATE_COUNTERPARTY') {
-    badgeColor = 'bg-emerald-950 text-emerald-300 border-emerald-700';
-    borderColor = 'border-emerald-500 bg-emerald-950/80 shadow-emerald-500/20';
-    Icon = ShieldCheck;
-    iconColor = 'text-emerald-400';
+    shell = 'bg-black border-black text-white';
+    inner = 'bg-white/10';
+    sub = 'text-neutral-400';
+  } else if (cat === 'LIKELY_MULE') {
+    shell = 'bg-flame-500 border-black text-black';
+    inner = 'bg-black/10';
+    sub = 'text-black/70';
+  } else if (cat === 'MERCHANT') {
+    shell = 'bg-white border-black border-dashed text-black';
   }
 
-  // Endpoint icon override
-  let EndpointIcon = null;
-  if (isEndpoint) {
-    if (data.endpoint_type === 'ATM_WITHDRAWAL') EndpointIcon = ArrowDownToLine;
-    else if (data.endpoint_type === 'EXTERNAL_BANK') EndpointIcon = Landmark;
-    else if (data.endpoint_type === 'WALLET_TRANSFER') EndpointIcon = Wallet;
-    else if (data.endpoint_type === 'MERCHANT_PAYMENT') EndpointIcon = Store;
-  }
+  const EndpointIcon =
+    data.endpoint_type === 'ATM_WITHDRAWAL'
+      ? ArrowDownToLine
+      : data.endpoint_type === 'EXTERNAL_BANK'
+      ? Landmark
+      : data.endpoint_type === 'WALLET_TRANSFER'
+      ? Wallet
+      : data.endpoint_type === 'MERCHANT_PAYMENT'
+      ? Store
+      : null;
 
   return (
     <div
-      className={`min-w-[210px] rounded-xl border-2 p-3 text-xs shadow-xl transition-all duration-150 backdrop-blur-md ${borderColor} ${
-        selected ? 'ring-4 ring-blue-500/50 scale-105' : 'hover:scale-[1.02]'
+      className={`w-[236px] rounded-xl border-2 p-3.5 transition-transform ${shell} ${
+        selected ? 'ring-4 ring-flame-500/40 scale-[1.03]' : ''
       }`}
     >
-      <Handle type="target" position={Position.Left} className="!bg-blue-500 !w-2.5 !h-2.5" />
+      <Handle type="target" position={Position.Left} />
 
-      {/* Header: Bank & Category Badge */}
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-1.5 font-semibold text-slate-200">
-          <Icon className={`w-4 h-4 ${iconColor}`} />
-          <span className="truncate max-w-[110px]">{data.bank_code}</span>
-        </div>
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${badgeColor}`}>
-          {isSeed ? 'SEED' : category.replace('_', ' ')}
-        </span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold">{data.bank_code}</span>
+        <span className={`text-[13px] font-medium ${sub}`}>{tag}</span>
       </div>
 
-      {/* Pseudonym */}
-      <div className="font-mono text-xs font-bold text-slate-100 tracking-wider truncate mb-1.5">
-        {data.pseudo_id}
-      </div>
+      <div className="id mt-1.5 truncate">{data.pseudo_id}</div>
 
-      {/* Metrics: Attributed suspicious funds */}
-      <div className="bg-slate-950/60 rounded-lg p-2 border border-slate-800 space-y-1">
-        <div className="flex justify-between items-center text-[11px]">
-          <span className="text-slate-400">Attributed:</span>
-          <span className="font-mono font-semibold text-rose-300">
-            ₹{Number(data.attributed_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </span>
-        </div>
-
-        {category === 'LIKELY_MULE' && (
-          <div className="flex justify-between items-center text-[10px]">
-            <span className="text-slate-400">Suspicion:</span>
-            <span className="font-semibold text-rose-400">
-              {Math.round(data.confidence_score * 100)}%
-            </span>
+      <div className={`mt-3 rounded-lg px-3 py-2 ${inner}`}>
+        <div className={`text-[13px] ${sub}`}>Attributed</div>
+        <div className="font-display text-[20px] font-bold leading-tight num">{inr(data.attributed_amount)}</div>
+        {cat === 'LIKELY_MULE' && (
+          <div className="text-[13px] font-medium mt-0.5">
+            {Math.round(data.confidence_score * 100)}% suspicion
           </div>
         )}
       </div>
 
-      {/* Endpoint pill */}
-      {isEndpoint && (
-        <div className="mt-2 flex items-center gap-1 text-[10px] font-medium text-amber-300 bg-amber-950/50 border border-amber-800/60 rounded px-2 py-0.5">
-          {EndpointIcon && <EndpointIcon className="w-3 h-3 text-amber-400" />}
-          <span className="truncate">{data.endpoint_type?.replace('_', ' ')}</span>
+      {data.is_endpoint && (
+        <div className="mt-2.5 flex items-center gap-1.5 text-[13px] font-medium">
+          {EndpointIcon && <EndpointIcon className="w-4 h-4" />}
+          <span>{endpointLabel(data.endpoint_type || '')}</span>
         </div>
       )}
 
-      <Handle type="source" position={Position.Right} className="!bg-blue-500 !w-2.5 !h-2.5" />
+      <Handle type="source" position={Position.Right} />
     </div>
   );
 });

@@ -1,4 +1,5 @@
 import React from 'react';
+import logoImg from '../../assets/logo.jpg';
 import {
   LayoutDashboard,
   Network,
@@ -30,70 +31,84 @@ interface SidebarProps {
   pendingRequestsCount?: number;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
-  activeTab,
-  onTabChange,
-  pendingRequestsCount = 0,
-}) => {
-  const menuItems: { id: TabKey; label: string; icon: React.ElementType; badge?: number }[] = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'workspace', label: 'Investigation Workspace', icon: Network },
-    { id: 'lineage', label: 'Fund Lineage & Provenance', icon: GitFork },
-    { id: 'screening', label: '5-Pattern Screening', icon: SearchCode },
-    { id: 'timeline', label: 'Temporal Timeline', icon: History },
-    { id: 'endpoints', label: 'Off-Ramp Endpoints', icon: ArrowDownToLine },
-    { id: 'assessments', label: 'Account Assessments', icon: ShieldAlert },
-    { id: 'identity', label: 'Identity Resolution', icon: KeyRound, badge: pendingRequestsCount },
-    { id: 'simulator', label: 'Bank Simulator', icon: Banknote },
-    { id: 'reports', label: 'Case Dossier & Audit', icon: FileSpreadsheet },
+type Item = { id: TabKey; label: string; icon: React.ElementType; badge?: number };
+
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, pendingRequestsCount = 0 }) => {
+  const groups: { title: string; items: Item[] }[] = [
+    {
+      title: 'Investigate',
+      items: [
+        { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+        { id: 'screening', label: 'Pattern screening', icon: SearchCode },
+        { id: 'workspace', label: 'Investigation workspace', icon: Network },
+      ],
+    },
+    {
+      title: 'Trace results',
+      items: [
+        { id: 'lineage', label: 'Fund lineage', icon: GitFork },
+        { id: 'timeline', label: 'Timeline', icon: History },
+        { id: 'endpoints', label: 'Off-ramps', icon: ArrowDownToLine },
+        { id: 'assessments', label: 'Account assessments', icon: ShieldAlert },
+      ],
+    },
+    {
+      title: 'Governance',
+      items: [
+        { id: 'identity', label: 'Identity resolution', icon: KeyRound, badge: pendingRequestsCount },
+        { id: 'reports', label: 'Case dossier', icon: FileSpreadsheet },
+        { id: 'simulator', label: 'Bank simulator', icon: Banknote },
+      ],
+    },
   ];
 
   return (
-    <aside className="w-64 border-r border-slate-800 bg-slate-900/60 p-4 flex flex-col justify-between shrink-0">
-      <div className="space-y-1.5">
-        <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-          Investigation Suite
-        </div>
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onTabChange(item.id)}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 font-semibold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                <span>{item.label}</span>
-              </div>
-              {item.badge !== undefined && item.badge > 0 && (
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                    isActive ? 'bg-white text-blue-600' : 'bg-rose-600 text-white animate-pulse'
-                  }`}
-                >
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
+    <aside className="no-print w-72 shrink-0 bg-black text-white flex flex-col overflow-y-auto">
+      <div className="h-16 px-5 flex items-center border-b border-white/10 shrink-0">
+        <img
+          src={logoImg}
+          alt="Mule Matrix - CBDC Fund Provenance & Mule Detection"
+          className="h-11 w-auto object-contain object-left"
+        />
       </div>
 
-      {/* Footer Info */}
-      <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 text-[11px] text-slate-400">
-        <div className="flex items-center justify-between mb-1">
-          <span className="font-semibold text-slate-300">CBDC Architecture</span>
-          <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-blue-300">v2.0</span>
-        </div>
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          Synthetic banking data. Never exposes clear customer PII without compliance approval.
-        </p>
+      <nav className="flex-1 px-3 py-5 space-y-6">
+        {groups.map((g) => (
+          <div key={g.title}>
+            <div className="px-3 pb-2 text-sm text-neutral-500">{g.title}</div>
+            <div className="space-y-0.5">
+              {g.items.map((item) => {
+                const Icon = item.icon;
+                const active = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onTabChange(item.id)}
+                    aria-current={active ? 'page' : undefined}
+                    className={`relative w-full flex items-center justify-between gap-3 pl-4 pr-3 py-2.5 rounded-lg text-[15px] transition-colors text-left ${
+                      active ? 'bg-white/10 text-white font-semibold' : 'text-neutral-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {active && <span className="absolute left-0 top-2 bottom-2 w-1 rounded-full bg-flame-500" />}
+                    <span className="flex items-center gap-3">
+                      <Icon className={`w-[18px] h-[18px] ${active ? 'text-flame-500' : ''}`} />
+                      {item.label}
+                    </span>
+                    {item.badge ? (
+                      <span className="min-w-[22px] text-center text-[13px] font-bold px-1.5 py-0.5 rounded-full bg-flame-500 text-black">
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div className="m-3 p-4 rounded-xl border border-white/10 text-sm text-neutral-400 leading-relaxed">
+        Identities stay masked until a compliance reviewer approves a request.
       </div>
     </aside>
   );
