@@ -68,7 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, pendin
         <img
           src={logoImg}
           alt="Mule Matrix - CBDC Fund Provenance & Mule Detection"
-          className="h-11 w-auto object-contain object-left"
+          className="h-14 w-auto object-contain object-left"
         />
       </div>
 
